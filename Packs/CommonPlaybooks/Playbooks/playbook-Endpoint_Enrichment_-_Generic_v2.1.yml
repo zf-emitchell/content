@@ -654,7 +654,7 @@ tasks:
     note: false
     timertriggers: []
     ignoreworker: false
-    skipunavailable: true
+    skipunavailable: false
     quietmode: 0
   "27":
     id: "27"
