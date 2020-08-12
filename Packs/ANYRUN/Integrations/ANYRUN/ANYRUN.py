@@ -13,6 +13,9 @@ from base64 import b64encode
 
 ''' GLOBAL VARS / INSTANCE CONFIGURATION '''
 
+
+
+
 PARAMS = demisto.params()
 USERNAME = PARAMS.get('credentials', {}).get('identifier', '')
 PASSWORD = PARAMS.get('credentials', {}).get('password', '')
