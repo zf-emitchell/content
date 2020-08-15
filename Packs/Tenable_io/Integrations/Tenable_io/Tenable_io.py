@@ -19,6 +19,7 @@ FIELD_NAMES_MAP = {'ScanType': 'Type', 'ScanStart': 'StartTime', 'ScanEnd': 'End
                    'Count': 'VulnerabilityOccurences'}
 REMEDIATIONS_NAMES_MAP = {'Value': 'Id', 'Vulns': 'AssociatedVulnerabilities', 'Hosts': 'AffectedHosts',
                           'Remediation': 'Description'}
+
 ASSET_VULNS_NAMES_MAP = {'PluginId': 'Id', 'PluginFamily': 'Family', 'PluginName': 'Name',
                          'Count': 'VulnerabilityOccurences'}
 
