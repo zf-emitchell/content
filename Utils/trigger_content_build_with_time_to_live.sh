@@ -39,11 +39,11 @@ then
       _time_to_live=180
 fi
 
-if [ $_time_to_live -gt 540 ]
-then
-    echo "Maximum time is 540 minutes, please change the time_to_live argument"
-    exit 1
-fi
+#if [ $_time_to_live -gt 540 ]
+#then
+#    echo "Maximum time is 540 minutes, please change the time_to_live argument"
+#    exit 1
+#fi
 
 if [ -n "$_contrib_branch" ] && [ -z $_changed_pack ]
 then
