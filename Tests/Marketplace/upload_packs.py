@@ -521,7 +521,7 @@ def get_recent_commits_data(content_repo):
         str: last commit hash of head.
         str: previous commit of origin/master (origin/master~1)
     """
-    return content_repo.head.commit.hexsha, content_repo.commit('origin/master~1').hexsha
+    return content_repo.commit('origin/master').hexsha, content_repo.commit('origin/master~1').hexsha
 
 
 def check_if_index_is_updated(index_folder_path, content_repo, current_commit_hash, remote_previous_commit_hash,
@@ -753,8 +753,8 @@ def main():
     index_folder_path, index_blob, index_generation = download_and_extract_index(storage_bucket,
                                                                                  extract_destination_path)
 
-    check_if_index_is_updated(index_folder_path, content_repo, current_commit_hash, remote_previous_commit_hash,
-                              storage_bucket)
+    # check_if_index_is_updated(index_folder_path, content_repo, current_commit_hash, remote_previous_commit_hash,
+    #                           storage_bucket)
 
     # google cloud bigquery client initialized
     bq_client = init_bigquery_client(service_account)
@@ -769,7 +769,7 @@ def main():
         private_packs = []
 
     # clean index and gcs from non existing or invalid packs
-    clean_non_existing_packs(index_folder_path, private_packs, storage_bucket)
+    # clean_non_existing_packs(index_folder_path, private_packs, storage_bucket)
 
     # starting iteration over packs
     for pack in packs_list:
