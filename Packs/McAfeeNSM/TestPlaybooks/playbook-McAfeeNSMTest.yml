@@ -36,7 +36,7 @@ tasks:
     task:
       id: b7cbf292-f8c0-420d-8145-ae6dfc3256f3
       version: -1
-      name: get all registered domains of NSM
+      name: get all registered domains of NSM.
       script: McAfee NSM|||nsm-get-domains
       type: regular
       iscommand: true
