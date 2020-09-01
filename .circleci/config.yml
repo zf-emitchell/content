@@ -352,7 +352,7 @@ jobs:
           condition: << pipeline.parameters.instance_tests >>
           steps:
             - setup_remote_docker
-            - *restore_cache
+           # - *restore_cache
             - *add_ssh_keys
             - *prepare_environment
             - *infrastructure_testing
