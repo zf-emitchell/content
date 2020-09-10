@@ -1129,3 +1129,5 @@ script:
   script: '-'
   subtype: python3
   type: python
+tests:
+  - No Tests
