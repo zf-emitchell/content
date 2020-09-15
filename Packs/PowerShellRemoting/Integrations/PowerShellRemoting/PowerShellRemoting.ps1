@@ -45,20 +45,21 @@ function InvokeCommand ($Command)
     return $DemistoResult
 }
 
-function InvokeCommand ($Command)
+function DownloadFile ($Command)
 {
     $Temp = $demisto.UniqueFile()
     $FileName = $demisto.Investigation().id + "_" + $Temp
     $Session = CreateSession
     Copy-Item -FromSession $Session $Command -Destination $FileName
     $Session | Remove-PSsession
-    $demisto.Results(@{
+    $DemistoResult = Results(@{
        Type = 3;
        ContentsFormat = "text";
        Contents = "";
        File = $FileName;
        FileID = $Temp
     })
+    return $DemistoResult
 }
 
 $demisto.Info("Current command is: " + $demisto.GetCommand())
