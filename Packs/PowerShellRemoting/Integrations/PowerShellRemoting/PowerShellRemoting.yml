@@ -46,5 +46,12 @@ script:
     description: Remote to target machine which has powershell core installed on it
       and is set up for remoting
     execution: true
+  - name: pwsh-download-file
+    arguments:
+    - name: path
+      required: true
+      description:
+      isArray: false
+    description: Download a file from the remote endpoint.
   dockerimage: mcr.microsoft.com/powershell:centos-7
   runonce: false
