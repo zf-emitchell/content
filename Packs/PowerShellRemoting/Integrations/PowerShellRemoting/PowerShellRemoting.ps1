@@ -26,7 +26,8 @@ function InvokeCommand ($Command)
     #>
     $Title = "Result for PowerShell Remote SSH Command: $Command `n"
     $Session = CreateSession
-    $Result = Invoke-Command $Session -ScriptBlock { $Command }
+    $ScriptBlockCommand = $ExecutionContext.InvokeCommand.NewScriptBlock($finalscript)
+    $Result = Invoke-Command $Session -ScriptBlock { $ScriptBlockCommand }
 
     $EntryContext = [PSCustomObject]@{Command = $Command;Result = $Result}
     $Context = [PSCustomObject]@{
@@ -52,13 +53,13 @@ function DownloadFile ($Command)
     $Session = CreateSession
     Copy-Item -FromSession $Session $Command -Destination $FileName
     $Session | Remove-PSsession
-    $DemistoResult = Results(@{
+    $DemistoResult = @{
        Type = 3;
        ContentsFormat = "text";
        Contents = "";
        File = $FileName;
        FileID = $Temp
-    })
+    }
     return $DemistoResult
 }
 
