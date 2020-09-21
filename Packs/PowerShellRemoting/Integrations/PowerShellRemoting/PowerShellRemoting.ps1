@@ -29,6 +29,10 @@ function InvokeCommand ($Command)
     $ScriptBlockCommand = $ExecutionContext.InvokeCommand.NewScriptBlock($finalscript)
     $Result = Invoke-Command $Session -ScriptBlock { $ScriptBlockCommand }
 
+    $Result = Invoke-Command -ScriptBlock { param($p1)
+    "$p1"
+    } -ArgumentList $Command
+
     $EntryContext = [PSCustomObject]@{Command = $Command;Result = $Result}
     $Context = [PSCustomObject]@{
         PowerShellSSH = [PSCustomObject]@{Query=$EntryContext}
