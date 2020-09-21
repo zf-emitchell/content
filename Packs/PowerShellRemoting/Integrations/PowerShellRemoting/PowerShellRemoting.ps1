@@ -26,13 +26,10 @@ function InvokeCommand ($Command)
     #>
     $Title = "Result for PowerShell Remote SSH Command: $Command `n"
     $Session = CreateSession
-    $ScriptBlockCommand = $ExecutionContext.InvokeCommand.NewScriptBlock($finalscript)
-    $Result = Invoke-Command $Session -ScriptBlock { $ScriptBlockCommand }
-
-    $Result = Invoke-Command -ScriptBlock { param($p1)
-    "$p1"
-    } -ArgumentList $Command
-
+    $Temp = $demisto.UniqueFile()
+    $FileName = $demisto.Investigation().id + "_" + $Temp + ".ps1"
+    echo $Command | Out-File -FilePath $FileName
+    $Result = Invoke-Command $Session -FilePath $FileName
     $EntryContext = [PSCustomObject]@{Command = $Command;Result = $Result}
     $Context = [PSCustomObject]@{
         PowerShellSSH = [PSCustomObject]@{Query=$EntryContext}
