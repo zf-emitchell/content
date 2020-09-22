@@ -1009,12 +1009,22 @@ def nightly_install_packs(build, threads_print_manager, install_method=install_a
     run_threads_list(threads_list)
 
 
+def install_tests(build, threads_print_manager):
+    threads_list = []
+
+    # For each server url we install pack/ packs
+    for thread_index, server in enumerate(build.servers):
+        kwargs = {'client': server.client, 'host': server.host,
+                  'prints_manager': threads_print_manager,
+                  'thread_index': thread_index,
+                  'pack_path': f'{Build.test_pack_target}/test_pack.zip'}
+        threads_list.append(Thread(target=upload_zipped_packs, kwargs=kwargs))
+    run_threads_list(threads_list)
+    
+    
 def install_nightly_pack(build, prints_manager):
     threads_print_manager = ParallelPrintsManager(len(build.servers))
     nightly_install_packs(build, threads_print_manager, install_method=install_all_content_packs)
-    create_nightly_test_pack()
-    nightly_install_packs(build, threads_print_manager, install_method=upload_zipped_packs,
-                          pack_path=f'{Build.test_pack_target}/test_pack.zip')
 
     prints_manager.add_print_job('Sleeping for 45 seconds...', print_warning, 0, include_timestamp=True)
     prints_manager.execute_thread_prints(0)
@@ -1153,7 +1163,7 @@ def disable_instances(build: Build, all_module_instances, prints_manager):
     prints_manager.execute_thread_prints(0)
 
 
-def create_nightly_test_pack():
+def create_test_pack():
     test_pack_zip(Build.content_path, Build.test_pack_target)
 
 
@@ -1265,6 +1275,9 @@ def main():
         else:
             pack_ids = get_non_added_packs_ids(build)
             installed_content_packs_successfully = install_packs(build, prints_manager, pack_ids=pack_ids)
+
+        create_test_pack()
+        install_tests(build, prints_manager)
     else:
         installed_content_packs_successfully = True
 
