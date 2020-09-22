@@ -1020,8 +1020,8 @@ def install_tests(build, threads_print_manager):
                   'pack_path': f'{Build.test_pack_target}/test_pack.zip'}
         threads_list.append(Thread(target=upload_zipped_packs, kwargs=kwargs))
     run_threads_list(threads_list)
-    
-    
+
+
 def install_nightly_pack(build, prints_manager):
     threads_print_manager = ParallelPrintsManager(len(build.servers))
     nightly_install_packs(build, threads_print_manager, install_method=install_all_content_packs)
