@@ -82,17 +82,19 @@ $demisto.Info("Current command is: " + $demisto.GetCommand())
 switch -Exact ($demisto.GetCommand())
 {
     'test-module' {
-        $TestConnection = InvokeCommand('$PSVersionTable', '172.31.38.7')
+        $TestConnection = InvokeCommand('$PSVersionTable', $global:HOSTNAME)
         $demisto.Results('ok'); Break
     }
     'ps-remote-query' {
         $Command = $demisto.Args().command
-        $RunCommand = InvokeCommand($Command, '172.31.38.7')
+        $Host = $demisto.Args().host
+        $RunCommand = InvokeCommand($Command, $Host)
         $demisto.Results($RunCommand); Break
     }
     'ps-remote-download-file' {
         $Path = $demisto.Args().path
-        $FileResult = DownloadFile($Path, '172.31.38.7')
+        $Host = $demisto.Args().host
+        $FileResult = DownloadFile($Path, $Host)
         $demisto.Results($FileResult); Break
     }
     'ps-remote-etl-create-start' {

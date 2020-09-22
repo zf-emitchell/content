@@ -9,7 +9,7 @@ description: |-
   Installation steps needed on target machine can be found in Microsoft's official documentation:
   https://docs.microsoft.com/en-us/powershell/scripting/learn/remoting/ssh-remoting-in-powershell-core?view=powershell-6
 configuration:
-- display: Domain/IP
+- display: Domain/IP (Used only for test)
   name: hostname
   defaultvalue: subdomain.example.com
   type: 0
@@ -26,6 +26,11 @@ script:
   commands:
   - name: ps-remote-query
     arguments:
+    - name: host
+      required: true
+      description: The hostname or IP address on which to create the ETL file. For
+        example myhost or 10.0.0.1. The user can provide a comma delimited list of
+        values.
     - name: command
       required: true
       description: PowerShell command (can be single or multiple in order of execution)
@@ -47,6 +52,11 @@ script:
     execution: true
   - name: ps-remote-download-file
     arguments:
+    - name: host
+      required: true
+      description: The hostname or IP address on which to create the ETL file. For
+        example myhost or 10.0.0.1. The user can provide a comma delimited list of
+        values.
     - name: path
       required: true
     description: Download a file from the remote endpoint.
