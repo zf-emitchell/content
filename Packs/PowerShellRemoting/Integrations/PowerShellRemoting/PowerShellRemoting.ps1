@@ -1,9 +1,8 @@
-. $PSScriptRoot\CommonServerPowerShell.ps1
 $global:HOSTNAME = $demisto.Params().hostname
 $global:USERNAME = $demisto.Params().credentials.identifier
 $global:PASSWORD = $demisto.Params().credentials.password
 
-function CreateSession ()
+function CreateSession ($Hostname)
 {
     <#
     .Description
@@ -11,12 +10,14 @@ function CreateSession ()
     #>
     $user = 'winrm\administrator'
     $password=ConvertTo-SecureString 'dD(;RJP?bRDI8qz=9mK2XK)ul;T*AT2Q' –asplaintext –force
+    # $user = $global:USERNAME
+    # $password=ConvertTo-SecureString $global:PASSWORD –asplaintext –force
     $Creds = new-object -typename System.Management.Automation.PSCredential -argumentlist $user, $password
-    $Session = New-PSSession -ComputerName 172.31.38.7 -Authentication Negotiate -credential $Creds -ErrorAction Stop
+    $Session = New-PSSession -ComputerName $Hostname -Authentication Negotiate -credential $Creds -ErrorAction Stop
     return $Session
 }
 
-function InvokeCommand ($Command)
+function InvokeCommand ($Command, $Hostname)
 {
     <#
     .Description
@@ -25,7 +26,7 @@ function InvokeCommand ($Command)
     Get-Process powershell
     #>
     $Title = "Result for PowerShell Remote SSH Command: $Command `n"
-    $Session = CreateSession
+    $Session = CreateSession($Hostname)
     $Temp = $demisto.UniqueFile()
     $FileName = $demisto.Investigation().id + "_" + $Temp + ".ps1"
     echo $Command | Out-File -FilePath $FileName
@@ -47,11 +48,11 @@ function InvokeCommand ($Command)
     return $DemistoResult
 }
 
-function DownloadFile ($Command)
+function DownloadFile ($Command, $Hostname)
 {
     $Temp = $demisto.UniqueFile()
     $FileName = $demisto.Investigation().id + "_" + $Temp
-    $Session = CreateSession
+    $Session = CreateSession($Hostname)
     Copy-Item -FromSession $Session $Command -Destination $FileName
     $Session | Remove-PSsession
     $DemistoResult = @{
@@ -64,23 +65,51 @@ function DownloadFile ($Command)
     return $DemistoResult
 }
 
+function StartETL ($Host, $EtlPath, $EtlFilter, $EtlTimeLim, $EtlMaxSize)
+{
+    $Command = 'netsh trace start capture=yes traceFile=' + $EtlPath + ' maxsize=' + $EtlMaxSize + ' ' + $EtlFilter
+    return InvokeCommand($Command, $Host)
+}
+
+function StopETL ($Host, $ZipFile, $CalculateHash)
+{
+    $Command = 'netsh trace stop'
+    return InvokeCommand($Command, $Host)
+}
+
 $demisto.Info("Current command is: " + $demisto.GetCommand())
 
 switch -Exact ($demisto.GetCommand())
 {
     'test-module' {
-        $TestConnection = InvokeCommand('$PSVersionTable')
+        $TestConnection = InvokeCommand('$PSVersionTable', '172.31.38.7')
         $demisto.Results('ok'); Break
     }
-    'pwsh-remoting-query' {
+    'ps-remote-query' {
         $Command = $demisto.Args().command
-        $RunCommand = InvokeCommand($Command)
+        $RunCommand = InvokeCommand($Command, '172.31.38.7')
         $demisto.Results($RunCommand); Break
     }
-    'pwsh-download-file' {
+    'ps-remote-download-file' {
         $Path = $demisto.Args().path
-        $FileResult = DownloadFile($Path)
+        $FileResult = DownloadFile($Path, '172.31.38.7')
         $demisto.Results($FileResult); Break
+    }
+    'ps-remote-etl-create-start' {
+        $Host = $demisto.Args().host
+        $EtlPath = $demisto.Args().etl_path
+        $EtlFilter = $demisto.Args().etl_filter
+        $EtlMaxSize = $demisto.Args().etl_max_size
+        $EtlTimeLim = $demisto.Args().etl_time_limit
+        $EtlStartResult = StartETL($Host, $EtlPath, $EtlFilter, $EtlMaxSize, $EtlTimeLim)
+        $demisto.Results($EtlStartResult); Break
+    }
+    'ps-remote-etl-create-stop' {
+        $Host = $demisto.Args().host
+        $ZipFile = $demisto.Args().zip_file
+        $CalculateHash = $demisto.Args().calculate_hash
+        $EtlStopResult = StopETL($Host, $EtlPath, $EtlFilter, $EtlMaxSize, $EtlTimeLim)
+        $demisto.Results($EtlStopResult); Break
     }
     Default {
         $demisto.Error('Unsupported command was entered.')

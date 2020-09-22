@@ -17,7 +17,6 @@ configuration:
   additionalinfo: Domain or IP of target machine
 - display: Username
   name: credentials
-  defaultvalue: ""
   type: 9
   required: true
   additionalinfo: User name in target machine
@@ -25,7 +24,7 @@ script:
   script: ''
   type: powershell
   commands:
-  - name: pwsh-remoting-query
+  - name: ps-remote-query
     arguments:
     - name: command
       required: true
@@ -46,12 +45,68 @@ script:
     description: Remote to target machine which has powershell core installed on it
       and is set up for remoting
     execution: true
-  - name: pwsh-download-file
+  - name: ps-remote-download-file
     arguments:
     - name: path
       required: true
-      description:
-      isArray: false
     description: Download a file from the remote endpoint.
+  - name: ps-remote-etl-create-start
+    arguments:
+    - name: host
+      required: true
+      description: The hostname or IP address on which to create the ETL file. For
+        example myhost or 10.0.0.1. The user can provide a comma delimited list of
+        values.
+    - name: etl_path
+      required: true
+      description: The path on the hostname on which to create the ETL file. For example
+        c:\temp\myhost.etl. The default value will be C:\Users\<usename>\AppData\Local\Temp\NetTraces\NetTrace.etl
+    - name: etl_filter
+      description: The filter to apply when creating the ETL file. For example IPv4.Address=1.1.1.1
+        to capture traffic just from the 1.1.1.1 IP address. If no filter is specified
+        all traffic will be recorded. More example can be found here, https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2012-r2-and-2012/jj129382(v=ws.11)#using-filters-to-limit-etl-trace-file-details
+    - name: etl_time_limit
+      description: This argument sets after how long the etl will stop capturing.
+        If no value is specified the capture will continue until the ps-remote-etl-create-stop
+        command has been executed for the same host or the user configured the etl_max_size
+        setting. Possible values can be 5 minutes, 1 day etc.
+    - name: etl_max_size
+      description: The maximum file size for the ETL. Once the file has reached this
+        size the capute will stop. For example 10MB. The default size is 10MB.
+      defaultValue: "10"
+    description: This command starts the recording of an ETL file on a windows endpoint.
+      ETL is just like a PCAP file which is created by the Windows Netsh command.
+  - name: ps-remote-etl-create-stop
+    arguments:
+    - name: host
+      required: true
+      description: The hostname or IP address on which to create the ETL file. For
+        example myhost or 10.0.0.1. The user can provide a comma delimited list of
+        values.
+    - name: zip_file
+      required: true
+      description: This argument specifies whether to compress the ETL file. Values
+        can be true or false.
+    - name: calculate_hash
+      auto: PREDEFINED
+      predefined:
+      - "true"
+      - "false"
+      description: Add the SHA256 hash of the ETL file.
+      defaultValue: "false"
+    outputs:
+    - contextPath: PsRemote.EtlFileName
+      description: The file name for the ETL
+      type: string
+    - contextPath: PsRemote.EtlFilePath
+      description: The file path and name for the ETL
+      type: string
+    - contextPath: PsRemote.EtlFileSize
+      description: The file size for the ETL
+      type: number
+    - contextPath: PsRemote.EtlFileSha256
+      description: The SHA256 for the ETL file.
+      type: string
+    description: This command ends the recording of an ETL file on a windows endpoint.
   dockerimage: mcr.microsoft.com/powershell:centos-7
   runonce: false
