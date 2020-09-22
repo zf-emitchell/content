@@ -31,11 +31,11 @@ script:
       description: The hostname or IP address on which to create the ETL file. For
         example myhost or 10.0.0.1. The user can provide a comma delimited list of
         values.
+      isArray: true
     - name: command
       required: true
       description: PowerShell command (can be single or multiple in order of execution)
         to run on the target machine
-      isArray: true
     outputs:
     - contextPath: PowerShellSSH.Query
       description: Object that contains data about the response of a command run in
@@ -57,6 +57,7 @@ script:
       description: The hostname or IP address on which to create the ETL file. For
         example myhost or 10.0.0.1. The user can provide a comma delimited list of
         values.
+      isArray: true
     - name: path
       required: true
     description: Download a file from the remote endpoint.
@@ -67,6 +68,7 @@ script:
       description: The hostname or IP address on which to create the ETL file. For
         example myhost or 10.0.0.1. The user can provide a comma delimited list of
         values.
+      isArray: true
     - name: etl_path
       required: true
       description: The path on the hostname on which to create the ETL file. For example
@@ -93,6 +95,7 @@ script:
       description: The hostname or IP address on which to create the ETL file. For
         example myhost or 10.0.0.1. The user can provide a comma delimited list of
         values.
+      isArray: true
     - name: zip_file
       required: true
       description: This argument specifies whether to compress the ETL file. Values
