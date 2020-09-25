@@ -9,17 +9,25 @@ description: |-
   Installation steps needed on target machine can be found in Microsoft's official documentation:
   https://docs.microsoft.com/en-us/powershell/scripting/learn/remoting/ssh-remoting-in-powershell-core?view=powershell-6
 configuration:
-- display: Domain/IP (Used only for test)
-  name: hostname
-  defaultvalue: subdomain.example.com
+- display: Domain
+  name: domain
   type: 0
-  required: true
-  additionalinfo: Domain or IP of target machine
+  required: false
+  additionalinfo: Fully Qualafied Domain Name suffix to be added to the Hostname.
+- display: DNS
+  name: dns
+  type: 0
+  required: false
 - display: Username
   name: credentials
   type: 9
   required: true
   additionalinfo: User name in target machine
+- display: Test Hostname
+  name: hostname
+  type: 0
+  required: false
+  additionalinfo: Hostname to provide a test for the integration connectivity.
 script:
   script: ''
   type: powershell
@@ -57,9 +65,25 @@ script:
       description: The hostname or IP address on which to create the ETL file. For
         example myhost or 10.0.0.1. The user can provide a comma delimited list of
         values.
-      isArray: true
     - name: path
       required: true
+      description: The expected path of the file to download.
+    - name: zip_file
+      auto: PREDEFINED
+      predefined:
+      - "true"
+      - "false"
+      description: This argument specifies whether to compress the file. Values can
+        be true or false.
+      defaultValue: "false"
+    - name: check_hash
+      auto: PREDEFINED
+      predefined:
+      - "true"
+      - "false"
+      description: Compare the values of the original file and downloaded file, and
+        returns an error if any differences are found.
+      defaultValue: "false"
     description: Download a file from the remote endpoint.
   - name: ps-remote-etl-create-start
     arguments:
@@ -96,30 +120,37 @@ script:
         example myhost or 10.0.0.1. The user can provide a comma delimited list of
         values.
       isArray: true
-    - name: zip_file
-      required: true
-      description: This argument specifies whether to compress the ETL file. Values
-        can be true or false.
-    - name: calculate_hash
-      auto: PREDEFINED
-      predefined:
-      - "true"
-      - "false"
-      description: Add the SHA256 hash of the ETL file.
-      defaultValue: "false"
-    outputs:
-    - contextPath: PsRemote.EtlFileName
-      description: The file name for the ETL
-      type: string
-    - contextPath: PsRemote.EtlFilePath
-      description: The file path and name for the ETL
-      type: string
-    - contextPath: PsRemote.EtlFileSize
-      description: The file size for the ETL
-      type: number
-    - contextPath: PsRemote.EtlFileSha256
-      description: The SHA256 for the ETL file.
-      type: string
     description: This command ends the recording of an ETL file on a windows endpoint.
+  - name: ps-remote-export-registry
+    arguments:
+    - name: host
+      required: true
+      description: The hostname or IP address on which to create the ETL file. For
+        example myhost or 10.0.0.1. The user can provide a comma delimited list of
+        values.
+      isArray: true
+    - name: reg_key_hive
+      description: The registry key or hive to export. For example reg_key_hive=`HKEY_LOCAL_MACHINE`.
+        If the user specifies all as the value. The entire registry will be exported.
+        Default value is all.
+      defaultValue: all
+    - name: file_path
+      required: true
+      description: The path and name on the windows host where the registry file will
+        be created. For example, file_path=c:\hklm.reg.
+    outputs:
+    - contextPath: PsRemote.RegFileSha256
+      description: The SHA256 for the registry file.
+      type: string
+    - contextPath: PsRemote.RegFileSize
+      description: The file size for the registry file.
+      type: string
+    - contextPath: PsRemote.RegFilePath
+      description: The file path and name for the registry file.
+      type: string
+    - contextPath: PsRemote.RegFileName
+      description: The file name for the registry file.
+      type: string
+    description: This command exports the specified Registry of hive to a file.
   dockerimage: mcr.microsoft.com/powershell:centos-7
   runonce: false
