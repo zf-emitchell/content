@@ -33,9 +33,10 @@ function InvokeCommand ($Command, $Hostname)
     $Title = "Result for PowerShell Remote SSH Command: $Command `n"
     $Session = CreateSession $Hostname
     $Result = InvokeCommandInSession $Command $Session
+    $Session | Remove-PSsession
     $EntryContext = [PSCustomObject]@{Command = $Command;Result = $Result}
     $Context = [PSCustomObject]@{
-        PowerShellSSH = [PSCustomObject]@{Query=$EntryContext}
+        PsRemote = [PSCustomObject]@{Query=$EntryContext}
     }
     $Contents = $Title + $Result
 
@@ -60,12 +61,23 @@ function InvokeCommandInSession ($Command, $Session)
 
 function DownloadFile ($Path, $Hostname, $ZipFile, $CheckHash)
 {
+    $FileNameLeaf = Split-Path $Path -leaf
     $Temp = $demisto.UniqueFile()
     $FileName = $demisto.Investigation().id + "_" + $Temp
     $Session = CreateSession $Hostname
+    $Command = '[System.IO.File]::Exists("' + $Path + '")'
+    $Result = InvokeCommandInSession $Command $Session
+    if(-Not $Result) {
+        $Session | Remove-PSsession
+        ReturnError($Path + " was not found on the remote host.")
+        exit(0)
+    }
+
+
     if($ZipFile -eq 'true') {
         $OldPath = $Path
         $Path = $Path + ".zip"
+        $FileNameLeaf = $FileNameLeaf + ".zip"
         $command = 'Compress-Archive -Path ' + $OldPath + ' -Update -DestinationPath ' + $Path
         InvokeCommandInSession $command $Session
     }
@@ -80,9 +92,9 @@ function DownloadFile ($Path, $Hostname, $ZipFile, $CheckHash)
     }
     $Session | Remove-PSsession
     if($CheckHash -eq 'true') {
-         $DstHash = (Get-FileHash $FileName).Hash
+         $DstHash = (Get-FileHash $FileName -Algorithm MD5).Hash
          if($SrcHash -ne $DstHash) {
-            ReturnError 'Failed check_hash: The downloaded file has a different hash than the file in the host. $SrcHash=' + $SrcHash + ' $DstHash=' + $DstHash
+            ReturnError('Failed check_hash: The downloaded file has a different hash than the file in the host. $SrcHash=' + $SrcHash + ' $DstHash=' + $DstHash)
             exit(0)
          }
     }
@@ -90,29 +102,113 @@ function DownloadFile ($Path, $Hostname, $ZipFile, $CheckHash)
        Type = 3;
        ContentsFormat = "text";
        Contents = "";
-       File = $FileName;
+       File = $FileNameLeaf;
        FileID = $Temp
     }
-    return $DemistoResult
+    $demisto.Results($DemistoResult)
+
+    $FileExtension = [System.IO.Path]::GetExtension($FileNameLeaf)
+    $FileExtension = If ($FileExtension) {$FileExtension.SubString(1, $FileExtension.length - 1)} else {""}
+    $ExtensionLen = $FileExtension.length
+    $FileExtension =
+
+    $EntryContext = [PSCustomObject]@{
+        PsRemoteDownloadedFile = [PSCustomObject]@{
+            FileName = $FileNameLeaf;
+            FileSize = Get-Item $FileName | % {[math]::ceiling($_.length / 1kb)};
+            FileSHA1 = (Get-FileHash $FileName -Algorithm SHA1).Hash;
+            FileSHA256 = (Get-FileHash $FileName -Algorithm SHA256).Hash;
+            FileMD5 = (Get-FileHash $FileName -Algorithm MD5).Hash;
+            FileExtension = $FileExtension
+          }
+    }
+    return $DemistoResult = @{
+       Type = 1;
+       ContentsFormat = "text";
+       Contents = "";
+       EntryContext = $EntryContext;
+    }
 }
 
-function StartETL ($Hostname, $EtlPath, $EtlFilter, $EtlMaxSize, $EtlTimeLim)
+function StartETL ($Hostname, $EtlPath, $EtlFilter, $EtlMaxSize, $EtlTimeLim, $Overwrite)
 {
-    $Command = 'netsh trace start capture=yes traceFile=' + $EtlPath + ' maxsize=' + $EtlMaxSize + ' ' + $EtlFilter
-    return InvokeCommand $Command $Hostname
+    $Title = "You have executed the start ETL command successfully `n"
+    $Command = 'netsh trace start capture=yes traceFile=' + $EtlPath + ' maxsize=' + $EtlMaxSize + ' overwrite=' + $Overwrite + ' ' + $EtlFilter
+    $Session = CreateSession $Hostname
+    $Contents = InvokeCommandInSession $Command $Session
+    $Session | Remove-PSsession
+    $EntryContext = [PSCustomObject]@{
+        PsRemote = [PSCustomObject]@{CommandResult = $Contents; EtlFilePath = $EtlPath; EtlFileName = Split-Path $EtlPath -leaf}
+    }
+
+    $DemistoResult = @{
+        Type = 1;
+        ContentsFormat = "json";
+        Contents = $Contents;
+        EntryContext = $EntryContext;
+        ReadableContentsFormat = "markdown";
+        HumanReadable = $Title + $Contents;
+    }
+
+    return $DemistoResult
 }
 
 function StopETL ($Hostname)
 {
     $Command = 'netsh trace stop'
-    return InvokeCommand $Command $Hostname
+    $Session = CreateSession $Hostname
+    $Contents = InvokeCommandInSession $Command $Session
+    $Session | Remove-PSsession
+    $EtlPath = echo $Contents | Select-String -Pattern "File location = "
+    if($EtlPath) {
+        $EtlPath = $EtlPath.ToString()
+        $EtlPath = $EtlPath.Substring(16, $EtlPath.Length - 16)
+    } else {
+        $EtlPath = ""
+    }
+    if($Contents) {
+        $Contents = [string]$Contents
+    }
+    $EntryContext = [PSCustomObject]@{
+        PsRemote = [PSCustomObject]@{CommandResult = $Contents; EtlFilePath = $EtlPath; EtlFileName = If ($EtlPath) {Split-Path $EtlPath -leaf} else {""}}
+    }
+
+    $DemistoResult = @{
+        Type = 1;
+        ContentsFormat = "json";
+        Contents = $Contents;
+        EntryContext = $EntryContext;
+        ReadableContentsFormat = "markdown";
+        HumanReadable = $Contents;
+    }
+
+    return $DemistoResult
 }
 
 function ExportRegistry ($Hostname, $RegKeyHive, $FilePath)
 {
     $command = If ($RegKeyHive -eq 'all') {'regedit /e '} Else {'reg export ' + $RegKeyHive + ' '}
-    $command = $command + $FilePaths
-    return InvokeCommand $command $Hostname
+    $command = $command + $FilePath
+    $Title = "Ran Export Registry. `n"
+    $Session = CreateSession $Hostname
+    $Contents = InvokeCommandInSession $Command $Session
+    $command = 'Get-Item ' + $FilePath + ' | % {[math]::ceiling($_.length / 1kb)}'
+    $FileSize = InvokeCommandInSession $command $Session
+    $Session | Remove-PSsession
+    $EntryContext = [PSCustomObject]@{
+        PsRemote = [PSCustomObject]@{CommandResult = $Contents; RegistryFilePath = $FilePath; RegistryFileName = Split-Path $FilePath -leaf}
+    }
+
+    $DemistoResult = @{
+        Type = 1;
+        ContentsFormat = "json";
+        Contents = $Contents;
+        EntryContext = $EntryContext;
+        ReadableContentsFormat = "markdown";
+        HumanReadable = $Title + $Contents;
+    }
+
+    return $DemistoResult
 }
 
 $demisto.Info("Current command is: " + $demisto.GetCommand())
@@ -145,8 +241,9 @@ switch -Exact ($demisto.GetCommand())
         $EtlFilter = $demisto.Args().etl_filter
         $EtlMaxSize = $demisto.Args().etl_max_size
         $EtlTimeLim = $demisto.Args().etl_time_limit
+        $Overwrite = $demisto.Args().overwrite
 
-        $EtlStartResult = StartETL $Hostname $EtlPath $EtlFilter $EtlMaxSize $EtlTimeLim
+        $EtlStartResult = StartETL $Hostname $EtlPath $EtlFilter $EtlMaxSize $EtlTimeLim $Overwrite
         $demisto.Results($EtlStartResult); Break
     }
     'ps-remote-etl-create-stop' {

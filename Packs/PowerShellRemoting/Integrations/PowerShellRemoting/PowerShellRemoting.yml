@@ -45,20 +45,72 @@ script:
       description: PowerShell command (can be single or multiple in order of execution)
         to run on the target machine
     outputs:
-    - contextPath: PowerShellSSH.Query
+    - contextPath: PsRemote.Query
       description: Object that contains data about the response of a command run in
         target machine
       type: unknown
-    - contextPath: PowerShellSSH.Query.Result
+    - contextPath: PsRemote.Query.Result
       description: The result of the command run from target machine
       type: string
-    - contextPath: PowerShellSSH.Query.Command
+    - contextPath: PsRemote.Query.Command
       description: The command sent to target machine, used as ID of that query
       type: string
     description: Remote to target machine which has powershell core installed on it
       and is set up for remoting
     execution: true
   - name: ps-remote-download-file
+    outputs:
+    - contextPath: PsRemote.FileName
+      description: File name.
+      type: String
+    - contextPath: PsRemote.FileSize
+      description: File size.
+      type: Number
+    - contextPath: PsRemote.FileMD5
+      description: The MD5 hash of the file.
+      type: String
+    - contextPath: PsRemote.FileSHA1
+      description: The SHA1 hash of the file.
+      type: String
+    - contextPath: PsRemote.FileSHA256
+      description: The SHA256 hash of the file.
+      type: String
+    - contextPath: PsRemote.FileExtension
+      description: The extension of the file.
+      type: String
+    - contextPath: File.Size
+      description: The size of the file in bytes.
+      type: Number
+    - contextPath: File.SHA1
+      description: The SHA1 hash of the file.
+      type: String
+    - contextPath: File.SHA256
+      description: The SHA256 hash of the file.
+      type: String
+    - contextPath: File.SHA512
+      description: The SHA512 hash of the file.
+      type: String
+    - contextPath: File.Name
+      description: The full file name.
+      type: String
+    - contextPath: File.SSDeep
+      description: The ssdeep hash of the file.
+      type: String
+    - contextPath: File.EntryID
+      description: The ID for locating the file in the War Room.
+      type: String
+    - contextPath: File.Info
+      description: The file information.
+      type: String
+    - contextPath: File.Type
+      description: The file type.
+      type: String
+    - contextPath: File.MD5
+      description: The MD5 hash of the file.
+      type: String
+    - contextPath: File.Extension
+      description: 'The file extension, for example: ''txt''.'
+      type: String
     arguments:
     - name: host
       required: true
@@ -110,6 +162,20 @@ script:
       description: The maximum file size for the ETL. Once the file has reached this
         size the capute will stop. For example 10MB. The default size is 10MB.
       defaultValue: "10"
+    - name: overwrite
+      required: false
+      description: Overwrite the file in path.
+      defaultValue: "no"
+      auto: PREDEFINED
+      predefined:
+        - "yes"
+        - "no"
+    outputs:
+    - contextPath: PsRemote.EtlFileName
+      description: The file name for the ETL
+      type: string
+    - contextPath: PsRemote.EtlFilePath
+      description: The file path and name for the ETL
     description: This command starts the recording of an ETL file on a windows endpoint.
       ETL is just like a PCAP file which is created by the Windows Netsh command.
   - name: ps-remote-etl-create-stop
