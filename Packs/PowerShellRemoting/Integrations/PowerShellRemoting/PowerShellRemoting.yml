@@ -246,5 +246,22 @@ script:
         returns an error if any differences are found.
       defaultValue: "false"
     description: Uploads a file from XSOAR to the remote endpoint.
+  - name: ps-remote-export-mft
+    arguments:
+    - name: host
+      required: true
+      description: Specify host(s) to retrieve data from.
+      isArray: true
+    - name: volume
+      required: true
+      description: Specify a volume to retrieve its master file table.
+    - name: csv_output
+      auto: PREDEFINED
+      predefined:
+      - "true"
+      - "false"
+      description: If set to true will return the result as a CSV file.
+      defaultValue: "false"
+    description: Extract master file table from volume.
   dockerimage: mcr.microsoft.com/powershell:centos-7
   runonce: false
