@@ -59,6 +59,31 @@ script:
       and is set up for remoting
     execution: true
   - name: ps-remote-download-file
+    arguments:
+    - name: host
+      required: true
+      description: The hostname or IP address on which to create the ETL file. For
+        example myhost or 10.0.0.1. The user can provide a comma delimited list of
+        values.
+    - name: path
+      required: true
+      description: The expected path of the file to download.
+    - name: zip_file
+      auto: PREDEFINED
+      predefined:
+      - "true"
+      - "false"
+      description: This argument specifies whether to compress the file. Values can
+        be true or false.
+      defaultValue: "false"
+    - name: check_hash
+      auto: PREDEFINED
+      predefined:
+      - "true"
+      - "false"
+      description: Compare the values of the original file and downloaded file, and
+        returns an error if any differences are found.
+      defaultValue: "false"
     outputs:
     - contextPath: PsRemote.FileName
       description: File name.
@@ -111,31 +136,6 @@ script:
     - contextPath: File.Extension
       description: 'The file extension, for example: ''txt''.'
       type: String
-    arguments:
-    - name: host
-      required: true
-      description: The hostname or IP address on which to create the ETL file. For
-        example myhost or 10.0.0.1. The user can provide a comma delimited list of
-        values.
-    - name: path
-      required: true
-      description: The expected path of the file to download.
-    - name: zip_file
-      auto: PREDEFINED
-      predefined:
-      - "true"
-      - "false"
-      description: This argument specifies whether to compress the file. Values can
-        be true or false.
-      defaultValue: "false"
-    - name: check_hash
-      auto: PREDEFINED
-      predefined:
-      - "true"
-      - "false"
-      description: Compare the values of the original file and downloaded file, and
-        returns an error if any differences are found.
-      defaultValue: "false"
     description: Download a file from the remote endpoint.
   - name: ps-remote-etl-create-start
     arguments:
@@ -163,13 +163,12 @@ script:
         size the capute will stop. For example 10MB. The default size is 10MB.
       defaultValue: "10"
     - name: overwrite
-      required: false
-      description: Overwrite the file in path.
-      defaultValue: "no"
       auto: PREDEFINED
       predefined:
-        - "yes"
-        - "no"
+      - "yes"
+      - "no"
+      description: Overwrite the file in path.
+      defaultValue: "no"
     outputs:
     - contextPath: PsRemote.EtlFileName
       description: The file name for the ETL
@@ -218,5 +217,34 @@ script:
       description: The file name for the registry file.
       type: string
     description: This command exports the specified Registry of hive to a file.
+  - name: ps-remote-upload-file
+    arguments:
+    - name: entry_id
+      required: true
+      description: File entry ID as appears in XSOAR.
+    - name: host
+      required: true
+      description: The hostname or IP address on which to upload the file. For example
+        myhost or 10.0.0.1.
+    - name: path
+      required: true
+      description: The target path of the file to upload.
+    - name: zip_file
+      auto: PREDEFINED
+      predefined:
+      - "true"
+      - "false"
+      description: This argument specifies whether to compress the file. Values can
+        be true or false.
+      defaultValue: "false"
+    - name: check_hash
+      auto: PREDEFINED
+      predefined:
+      - "true"
+      - "false"
+      description: Compare the values of the original file and downloaded file, and
+        returns an error if any differences are found.
+      defaultValue: "false"
+    description: Uploads a file from XSOAR to the remote endpoint.
   dockerimage: mcr.microsoft.com/powershell:centos-7
   runonce: false

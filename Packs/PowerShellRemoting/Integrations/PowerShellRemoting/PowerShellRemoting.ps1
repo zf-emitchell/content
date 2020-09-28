@@ -16,7 +16,7 @@ function CreateSession ($Hostname)
     #>
     $user = $global:USERNAME
     $password=ConvertTo-SecureString $global:PASSWORD –asplaintext –force
-    $fqdn = $Hostname + $global:DOMAIN
+    $fqdn = $Hostname | ForEach-Object -Process {$_ + $global:DOMAIN}
     $Creds = new-object -typename System.Management.Automation.PSCredential -argumentlist $user, $password
     $Session = New-PSSession -ComputerName $fqdn -Authentication Negotiate -credential $Creds -ErrorAction Stop
     return $Session
@@ -61,7 +61,6 @@ function InvokeCommandInSession ($Command, $Session)
 
 function DownloadFile ($Path, $Hostname, $ZipFile, $CheckHash)
 {
-    $FileNameLeaf = Split-Path $Path -leaf
     $Temp = $demisto.UniqueFile()
     $FileName = $demisto.Investigation().id + "_" + $Temp
     $Session = CreateSession $Hostname
@@ -73,11 +72,9 @@ function DownloadFile ($Path, $Hostname, $ZipFile, $CheckHash)
         exit(0)
     }
 
-
     if($ZipFile -eq 'true') {
         $OldPath = $Path
         $Path = $Path + ".zip"
-        $FileNameLeaf = $FileNameLeaf + ".zip"
         $command = 'Compress-Archive -Path ' + $OldPath + ' -Update -DestinationPath ' + $Path
         InvokeCommandInSession $command $Session
     }
@@ -94,10 +91,12 @@ function DownloadFile ($Path, $Hostname, $ZipFile, $CheckHash)
     if($CheckHash -eq 'true') {
          $DstHash = (Get-FileHash $FileName -Algorithm MD5).Hash
          if($SrcHash -ne $DstHash) {
-            ReturnError('Failed check_hash: The downloaded file has a different hash than the file in the host. $SrcHash=' + $SrcHash + ' $DstHash=' + $DstHash)
+            ReturnError('Failed check_hash: The downloaded file has a different hash than the file in the host. RemoteHostHash=' + $SrcHash + ' DownloadedHash=' + $DstHash)
             exit(0)
          }
     }
+    $FileNameLeaf = Split-Path $Path -leaf
+
     $DemistoResult = @{
        Type = 3;
        ContentsFormat = "text";
@@ -109,8 +108,6 @@ function DownloadFile ($Path, $Hostname, $ZipFile, $CheckHash)
 
     $FileExtension = [System.IO.Path]::GetExtension($FileNameLeaf)
     $FileExtension = If ($FileExtension) {$FileExtension.SubString(1, $FileExtension.length - 1)} else {""}
-    $ExtensionLen = $FileExtension.length
-    $FileExtension =
 
     $EntryContext = [PSCustomObject]@{
         PsRemoteDownloadedFile = [PSCustomObject]@{
@@ -211,17 +208,64 @@ function ExportRegistry ($Hostname, $RegKeyHive, $FilePath)
     return $DemistoResult
 }
 
+function UploadFile($EntryId, $DstPath, $Hostname, $ZipFile, $CheckHash)
+{
+    $Session = CreateSession $Hostname
+    $SrcPath = $demisto.GetFilePath($EntryId).path
+    if($ZipFile -eq 'true') {
+        $OldPath = $SrcPath
+        $SrcPath = $SrcPath + ".zip"
+        Compress-Archive -Path $OldPath -Update -DestinationPath $SrcPath
+    }
+    if($CheckHash -eq 'true') {
+         $SrcHash = (Get-FileHash $SrcPath -Algorithm MD5).Hash
+    }
+    Copy-Item -ToSession $Session $SrcPath -Destination $DstPath
+    if($CheckHash -eq 'true') {
+         $command = '(Get-FileHash ' + $DstPath + ' -Algorithm MD5).Hash'
+         $DstHash = InvokeCommandInSession $command $Session
+         if($SrcHash -ne $DstHash) {
+            ReturnError('Failed check_hash: The uploaded file has a different hash than the local file. LocalFileHash=' + $SrcHash + ' UploadedFileHash=' + $DstHash)
+            exit(0)
+         }
+    }
+    $Session | Remove-PSsession
+
+    $FileNameLeaf = Split-Path $SrcPath -leaf
+    $FileExtension = [System.IO.Path]::GetExtension($FileNameLeaf)
+    $FileExtension = If ($FileExtension) {$FileExtension.SubString(1, $FileExtension.length - 1)} else {""}
+
+    $EntryContext = [PSCustomObject]@{
+        PsRemoteDownloadedFile = [PSCustomObject]@{
+            FileName = $FileNameLeaf;
+            FileSize = Get-Item $SrcPath | % {[math]::ceiling($_.length / 1kb)};
+            FileSHA1 = (Get-FileHash $SrcPath -Algorithm SHA1).Hash;
+            FileSHA256 = (Get-FileHash $SrcPath -Algorithm SHA256).Hash;
+            FileMD5 = (Get-FileHash $SrcPath -Algorithm MD5).Hash;
+            FileExtension = $FileExtension
+          }
+    }
+    return $DemistoResult = @{
+       Type = 1;
+       ContentsFormat = "text";
+       Contents = "";
+       EntryContext = $EntryContext;
+       HumanReadable = "File upload command finished execution."
+    }
+}
+
 $demisto.Info("Current command is: " + $demisto.GetCommand())
 
 switch -Exact ($demisto.GetCommand())
 {
     'test-module' {
-        $TestConnection = InvokeCommand '$PSVersionTable' $global:HOSTNAME
+        $Hostname = ArgToList $global:HOSTNAME
+        $TestConnection = InvokeCommand '$PSVersionTable' $Hostname
         $demisto.Results('ok'); Break
     }
     'ps-remote-query' {
         $Command = $demisto.Args().command
-        $Hostname = $demisto.Args().host
+        $Hostname = ArgToList $demisto.Args().host
 
         $RunCommand = InvokeCommand $Command $Hostname
         $demisto.Results($RunCommand); Break
@@ -236,7 +280,7 @@ switch -Exact ($demisto.GetCommand())
         $demisto.Results($FileResult); Break
     }
     'ps-remote-etl-create-start' {
-        $Hostname = $demisto.Args().host
+        $Hostname = ArgToList $demisto.Args().host
         $EtlPath = $demisto.Args().etl_path
         $EtlFilter = $demisto.Args().etl_filter
         $EtlMaxSize = $demisto.Args().etl_max_size
@@ -247,18 +291,28 @@ switch -Exact ($demisto.GetCommand())
         $demisto.Results($EtlStartResult); Break
     }
     'ps-remote-etl-create-stop' {
-        $Hostname = $demisto.Args().host
+        $Hostname = ArgToList $demisto.Args().host
 
         $EtlStopResult = StopETL $Hostname
         $demisto.Results($EtlStopResult); Break
     }
     'ps-remote-export-registry' {
-        $Hostname = $demisto.Args().host
+        $Hostname = ArgToList $demisto.Args().host
         $RegKeyHive = $demisto.Args().reg_key_hive
         $FilePath = $demisto.Args().file_path
 
         $result = ExportRegistry $Hostname $RegKeyHive $FilePath
         $demisto.Results($result); Break
+    }
+    'ps-remote-upload-file' {
+        $EntryId = $demisto.Args().entry_id
+        $Path = $demisto.Args().path
+        $Hostname = $demisto.Args().host
+        $ZipFile = $demisto.Args().zip_file
+        $CheckHash = $demisto.Args().check_hash
+
+        $Result = UploadFile $EntryId $Path $Hostname $ZipFile $CheckHash
+        $demisto.Results($Result); Break
     }
     Default {
         $demisto.Error('Unsupported command was entered.')
