@@ -3,12 +3,13 @@ $global:HOSTNAME = $demisto.Params().hostname
 $global:USERNAME = $demisto.Params().credentials.identifier
 $global:PASSWORD = $demisto.Params().credentials.password
 $global:DNS = $demisto.Params().dns
+$global:COMMAND = $demisto.GetCommand()
 
 if($global:DNS) {
     "nameserver $global:DNS" | Set-Content -Path \etc\resolv.conf
 }
 
-function CreateSession ($Hostname)
+function CreateSession ($Hostname, $IPHosts)
 {
     <#
     .Description
@@ -17,12 +18,22 @@ function CreateSession ($Hostname)
     $user = $global:USERNAME
     $password=ConvertTo-SecureString $global:PASSWORD –asplaintext –force
     $fqdn = $Hostname | ForEach-Object -Process {$_ + $global:DOMAIN}
+    if($IPHosts) {
+        if($fqdn -and ($fqdn.GetType().fullname -eq 'System.String')) {
+            $x = [System.Collections.ArrayList]::new()
+            $x += $fqdn
+            $fqdn = $x + $IPHosts
+        }
+        else {
+            $fqdn += $IPHosts
+        }
+    }
     $Creds = new-object -typename System.Management.Automation.PSCredential -argumentlist $user, $password
     $Session = New-PSSession -ComputerName $fqdn -Authentication Negotiate -credential $Creds -ErrorAction Stop
     return $Session
 }
 
-function InvokeCommand ($Command, $Hostname)
+function InvokeCommand ($Command, $Hostname, $IPHosts)
 {
     <#
     .Description
@@ -30,13 +41,13 @@ function InvokeCommand ($Command, $Hostname)
     .Example
     Get-Process powershell
     #>
-    $Title = "Result for PowerShell Remote SSH Command: $Command `n"
-    $Session = CreateSession $Hostname
+    $Title = "Result for PowerShell Remote Command: $Command `n"
+    $Session = CreateSession $Hostname $IPHosts
     $Result = InvokeCommandInSession $Command $Session
     $Session | Remove-PSsession
     $EntryContext = [PSCustomObject]@{Command = $Command;Result = $Result}
     $Context = [PSCustomObject]@{
-        PsRemote = [PSCustomObject]@{Query=$EntryContext}
+        PsRemote = [PSCustomObject]@{Command=$EntryContext}
     }
     $Contents = $Title + $Result
 
@@ -59,11 +70,11 @@ function InvokeCommandInSession ($Command, $Session)
     return Invoke-Command $Session -FilePath $FileName
 }
 
-function DownloadFile ($Path, $Hostname, $ZipFile, $CheckHash)
+function DownloadFile ($Path, $Hostname, $IPHosts, $ZipFile, $CheckHash)
 {
     $Temp = $demisto.UniqueFile()
     $FileName = $demisto.Investigation().id + "_" + $Temp
-    $Session = CreateSession $Hostname
+    $Session = CreateSession $Hostname $IPHosts
     $Command = '[System.IO.File]::Exists("' + $Path + '")'
     $Result = InvokeCommandInSession $Command $Session
     if(-Not $Result) {
@@ -127,11 +138,11 @@ function DownloadFile ($Path, $Hostname, $ZipFile, $CheckHash)
     }
 }
 
-function StartETL ($Hostname, $EtlPath, $EtlFilter, $EtlMaxSize, $EtlTimeLim, $Overwrite)
+function StartETL ($Hostname, $IPHosts, $EtlPath, $EtlFilter, $EtlMaxSize, $EtlTimeLim, $Overwrite)
 {
     $Title = "You have executed the start ETL command successfully `n"
     $Command = 'netsh trace start capture=yes traceFile=' + $EtlPath + ' maxsize=' + $EtlMaxSize + ' overwrite=' + $Overwrite + ' ' + $EtlFilter
-    $Session = CreateSession $Hostname
+    $Session = CreateSession $Hostname $IPHosts
     $Contents = InvokeCommandInSession $Command $Session
     $Session | Remove-PSsession
     $EntryContext = [PSCustomObject]@{
@@ -150,10 +161,10 @@ function StartETL ($Hostname, $EtlPath, $EtlFilter, $EtlMaxSize, $EtlTimeLim, $O
     return $DemistoResult
 }
 
-function StopETL ($Hostname)
+function StopETL ($Hostname, $IPHosts)
 {
     $Command = 'netsh trace stop'
-    $Session = CreateSession $Hostname
+    $Session = CreateSession $Hostname $IPHosts
     $Contents = InvokeCommandInSession $Command $Session
     $Session | Remove-PSsession
     $EtlPath = echo $Contents | Select-String -Pattern "File location = "
@@ -182,16 +193,13 @@ function StopETL ($Hostname)
     return $DemistoResult
 }
 
-function ExportRegistry ($Hostname, $RegKeyHive, $FilePath)
+function ExportRegistry ($Hostname, $IPHosts, $RegKeyHive, $FilePath)
 {
     $command = If ($RegKeyHive -eq 'all') {'regedit /e '} Else {'reg export ' + $RegKeyHive + ' '}
     $command = $command + $FilePath
     $Title = "Ran Export Registry. `n"
-    $Session = CreateSession $Hostname
+    $Session = CreateSession $Hostname $IPHosts
     $Contents = InvokeCommandInSession $Command $Session
-    $command = 'Get-Item ' + $FilePath + ' | % {[math]::ceiling($_.length / 1kb)}'
-    $FileSize = InvokeCommandInSession $command $Session
-    $Session | Remove-PSsession
     $EntryContext = [PSCustomObject]@{
         PsRemote = [PSCustomObject]@{CommandResult = $Contents; RegistryFilePath = $FilePath; RegistryFileName = Split-Path $FilePath -leaf}
     }
@@ -208,9 +216,9 @@ function ExportRegistry ($Hostname, $RegKeyHive, $FilePath)
     return $DemistoResult
 }
 
-function UploadFile ($EntryId, $DstPath, $Hostname, $ZipFile, $CheckHash)
+function UploadFile ($EntryId, $DstPath, $Hostname, $IPHosts, $ZipFile, $CheckHash)
 {
-    $Session = CreateSession $Hostname
+    $Session = CreateSession $Hostname $IPHosts
     $SrcPath = $demisto.GetFilePath($EntryId).path
     if($ZipFile -eq 'true') {
         $OldPath = $SrcPath
@@ -254,10 +262,10 @@ function UploadFile ($EntryId, $DstPath, $Hostname, $ZipFile, $CheckHash)
     }
 }
 
-function ExportMFT ($Hostname, $Volume, $CSVResult)
+function ExportMFT ($Hostname, $IPHosts, $Volume, $OutPutFilePath)
 {
-        $RemoteScriptBlock = {
-        Param($Volume)
+    $RemoteScriptBlock = {
+        Param($Volume, $OutPutFilePath)
 
         if ($Volume -ne 0) {
             $Win32_Volume = Get-WmiObject -Class Win32_Volume -Filter "DriveLetter LIKE '$($Volume):'"
@@ -273,8 +281,9 @@ function ExportMFT ($Hostname, $Volume, $CSVResult)
                 break
             }
         }
-
-        $OutputFilePath = $env:TEMP + "\$([IO.Path]::GetRandomFileName())"
+        if(-not $OutputFilePath) {
+            $OutputFilePath = $env:TEMP + "\$([IO.Path]::GetRandomFileName())"
+        }
 
         #region WinAPI
 
@@ -421,106 +430,96 @@ function ExportMFT ($Hostname, $Volume, $CSVResult)
         }
         New-Object -TypeName PSObject -Property $Properties
     }
-    $Session = CreateSession $Hostname
-    $ReturnedObjects = Invoke-Command -Session $Session -ScriptBlock $RemoteScriptBlock -ArgumentList @($Volume)
+    $Session = CreateSession $Hostname $IPHosts
+    $ReturnedObjects = Invoke-Command -Session $Session -ScriptBlock $RemoteScriptBlock -ArgumentList @($Volume, $OutPutFilePath)
     $Session | Remove-PSsession
 
-    if($CSVResult -eq 'true') {
-        $Temp = $demisto.UniqueFile()
-        $FileName = $demisto.Investigation().id + "_" + $Temp
-        $ReturnedObjects | Export-Csv -Path $FileName -Append -NoTypeInformation -ErrorAction SilentlyContinue
-        return $DemistoResult = @{
-           Type = 3;
-           ContentsFormat = "text";
-           Contents = "";
-           File = $FileName;
-           FileID = $Temp
-        }
-    } else {
-        $Context = [PSCustomObject]@{
-            PsRemote = [PSCustomObject]@{ExportMFT=[PSCustomObject]@{Host = $Hostname; Volume = $Volume; Result = $ReturnedObjects}}
-        }
-        $HumanReadable = 'MFT Export results: `n' + $ReturnedObjects
-        return $DemistoResult = @{
-            Type = 1;
-            ContentsFormat = "json";
-            Contents = $ReturnedObjects;
-            EntryContext = $Context;
-            ReadableContentsFormat = "markdown";
-            HumanReadable = $HumanReadable
-        }
+    $ReturnedObjects = $ReturnedObjects | Add-Member -NotePropertyMembers @{Host=($Hostname + $IPHosts)} -PassThru
+    $Context = [PSCustomObject]@{
+        PsRemote = [PSCustomObject]@{ExportMFT=$ReturnedObjects}
+    }
+    $HumanReadable = 'MFT Export results: `n' + $ReturnedObjects
+    return $DemistoResult = @{
+        Type = 1;
+        ContentsFormat = "json";
+        Contents = $ReturnedObjects;
+        EntryContext = $Context;
+        ReadableContentsFormat = "markdown";
+        HumanReadable = $HumanReadable
     }
 }
 
-$demisto.Info("Current command is: " + $demisto.GetCommand())
+$demisto.Info("Current command is: " + $global:COMMAND)
 
-switch -Exact ($demisto.GetCommand())
-{
-    'test-module' {
-        $Hostname = ArgToList $global:HOSTNAME
-        $TestConnection = InvokeCommand '$PSVersionTable' $Hostname
-        $demisto.Results('ok'); Break
-    }
-    'ps-remote-query' {
-        $Command = $demisto.Args().command
-        $Hostname = ArgToList $demisto.Args().host
+$Hostname = if($global:COMMAND -eq 'test-module') {ArgToList $global:HOSTNAME} else {ArgToList $demisto.Args().host}
+$IPHosts = ArgToList $demisto.Args().ip
 
-        $RunCommand = InvokeCommand $Command $Hostname
-        $demisto.Results($RunCommand); Break
-    }
-    'ps-remote-download-file' {
-        $Path = $demisto.Args().path
-        $Hostname = $demisto.Args().host
-        $ZipFile = $demisto.Args().zip_file
-        $CheckHash = $demisto.Args().check_hash
+if(-not ($Hostname -or $IPHosts)) {
+    ReturnError('Please provide either a host name or host ip address.')
+}
+else {
+    switch -Exact ($global:COMMAND)
+    {
+        'test-module' {
+            $Hostname = ArgToList $global:HOSTNAME
+            $TestConnection = InvokeCommand '$PSVersionTable' $Hostname
+            $demisto.Results('ok'); Break
+        }
+        'ps-remote-command' {
+            $Command = $demisto.Args().command
 
-        $FileResult = DownloadFile $Path $Hostname $ZipFile $CheckHash
-        $demisto.Results($FileResult); Break
-    }
-    'ps-remote-etl-create-start' {
-        $Hostname = ArgToList $demisto.Args().host
-        $EtlPath = $demisto.Args().etl_path
-        $EtlFilter = $demisto.Args().etl_filter
-        $EtlMaxSize = $demisto.Args().etl_max_size
-        $EtlTimeLim = $demisto.Args().etl_time_limit
-        $Overwrite = $demisto.Args().overwrite
+            $RunCommand = InvokeCommand $Command $Hostname $IPHosts
+            $demisto.Results($RunCommand); Break
+        }
+        'ps-remote-download-file' {
+            $Path = $demisto.Args().path
+            $ZipFile = $demisto.Args().zip_file
+            $CheckHash = $demisto.Args().check_hash
 
-        $EtlStartResult = StartETL $Hostname $EtlPath $EtlFilter $EtlMaxSize $EtlTimeLim $Overwrite
-        $demisto.Results($EtlStartResult); Break
-    }
-    'ps-remote-etl-create-stop' {
-        $Hostname = ArgToList $demisto.Args().host
+            $FileResult = DownloadFile $Path $Hostname $IPHosts $ZipFile $CheckHash
+            $demisto.Results($FileResult); Break
+        }
+        'ps-remote-etl-create-start' {
+            $EtlPath = $demisto.Args().etl_path
+            $EtlFilter = $demisto.Args().etl_filter
+            $EtlMaxSize = $demisto.Args().etl_max_size
+            $EtlTimeLim = $demisto.Args().etl_time_limit
+            $Overwrite = $demisto.Args().overwrite
 
-        $EtlStopResult = StopETL $Hostname
-        $demisto.Results($EtlStopResult); Break
-    }
-    'ps-remote-export-registry' {
-        $Hostname = ArgToList $demisto.Args().host
-        $RegKeyHive = $demisto.Args().reg_key_hive
-        $FilePath = $demisto.Args().file_path
+            $EtlStartResult = StartETL $Hostname $IPHosts $EtlPath $EtlFilter $EtlMaxSize $EtlTimeLim $Overwrite
+            $demisto.Results($EtlStartResult); Break
+        }
+        'ps-remote-etl-create-stop' {
+            $Hostname = ArgToList $demisto.Args().host
 
-        $result = ExportRegistry $Hostname $RegKeyHive $FilePath
-        $demisto.Results($result); Break
-    }
-    'ps-remote-upload-file' {
-        $EntryId = $demisto.Args().entry_id
-        $Path = $demisto.Args().path
-        $Hostname = $demisto.Args().host
-        $ZipFile = $demisto.Args().zip_file
-        $CheckHash = $demisto.Args().check_hash
+            $EtlStopResult = StopETL $Hostname $IPHosts
+            $demisto.Results($EtlStopResult); Break
+        }
+        'ps-remote-export-registry' {
+            $RegKeyHive = $demisto.Args().reg_key_hive
+            $FilePath = $demisto.Args().file_path
 
-        $Result = UploadFile $EntryId $Path $Hostname $ZipFile $CheckHash
-        $demisto.Results($Result); Break
-    }
-    'ps-remote-export-mft' {
-        $Hostname = ArgToList $demisto.Args().host
-        $Volume = $demisto.Args().volume
-        $CSV = $demisto.Args().csv_output
+            $result = ExportRegistry $Hostname $IPHosts $RegKeyHive $FilePath
+            $demisto.Results($result); Break
+        }
+        'ps-remote-upload-file' {
+            $EntryId = $demisto.Args().entry_id
+            $Path = $demisto.Args().path
+            $ZipFile = $demisto.Args().zip_file
+            $CheckHash = $demisto.Args().check_hash
 
-        $Result = ExportMFT $Hostname $Volume $CSV
-        $demisto.Results($Result); Break
-    }
-    Default {
-        $demisto.Error('Unsupported command was entered.')
+            $Result = UploadFile $EntryId $Path $Hostname $IPHosts $ZipFile $CheckHash
+            $demisto.Results($Result); Break
+        }
+        'ps-remote-export-mft' {
+            $Volume = $demisto.Args().volume
+            $OutPutFilePath = $demisto.Args().output_path
+
+            $Result = ExportMFT $Hostname $IPHosts $Volume $OutPutFilePath
+            $demisto.Results($Result); Break
+        }
+        Default {
+            $demisto.Error('Unsupported command was entered.')
+        }
     }
 }

@@ -4,10 +4,12 @@ commonfields:
 name: PowerShell Remoting
 display: PowerShell Remoting
 category: Utilities
-description: |-
-  Use this integration in order to remote into another machine (windows/linux) using SSH, requires PowerShell core on both ends.
-  Installation steps needed on target machine can be found in Microsoft's official documentation:
-  https://docs.microsoft.com/en-us/powershell/scripting/learn/remoting/ssh-remoting-in-powershell-core?view=powershell-6
+description: "PowerShell Remoting is a comprehensive built-in remoting subsystem A
+  part of Microsofts native Windows management framework (WMF) and windows remote
+  management (WinRM).\nThis facility allows you to handle most remoting tasks in any
+  configuration you might encounter by creating a remote PowerShell session to windows
+  hosts and executing commands in the created session.\nThe integration includes out
+  of the box commands which supports agentless forensics for remote hosts "
 configuration:
 - display: Domain
   name: domain
@@ -32,39 +34,43 @@ script:
   script: ''
   type: powershell
   commands:
-  - name: ps-remote-query
+  - name: ps-remote-command
     arguments:
     - name: host
-      required: true
-      description: The hostname or IP address on which to create the ETL file. For
-        example myhost or 10.0.0.1. The user can provide a comma delimited list of
-        values.
+      description: The hostname on which to run the command. For example myhost. The
+        user can provide a comma delimited list of values.
       isArray: true
     - name: command
       required: true
       description: PowerShell command (can be single or multiple in order of execution)
         to run on the target machine
+    - name: ip
+      description: The IP of the host on which to run the command. For example 1.1.1.1.
+        The user can provide a comma delimited list of values.
+      isArray: true
     outputs:
-    - contextPath: PsRemote.Query
+    - contextPath: PsRemote.Command
       description: Object that contains data about the response of a command run in
         target machine
       type: unknown
-    - contextPath: PsRemote.Query.Result
+    - contextPath: PsRemote.Command.Result
       description: The result of the command run from target machine
       type: string
-    - contextPath: PsRemote.Query.Command
-      description: The command sent to target machine, used as ID of that query
+    - contextPath: PsRemote.Command.Command
+      description: The command sent to target machine, used as ID of that query.
       type: string
-    description: Remote to target machine which has powershell core installed on it
-      and is set up for remoting
+    description: Execute remote PowerShell commands on hosts.
     execution: true
   - name: ps-remote-download-file
     arguments:
     - name: host
-      required: true
-      description: The hostname or IP address on which to create the ETL file. For
-        example myhost or 10.0.0.1. The user can provide a comma delimited list of
+      description: The hostname on which to create the ETL file. For
+        example myhost. The user can provide a comma delimited list of
         values.
+    - name: ip
+      description: The IP of the host on which to run the command. For example 1.1.1.1.
+        The user can provide a comma delimited list of values.
+      isArray: true
     - name: path
       required: true
       description: The expected path of the file to download.
@@ -140,10 +146,13 @@ script:
   - name: ps-remote-etl-create-start
     arguments:
     - name: host
-      required: true
-      description: The hostname or IP address on which to create the ETL file. For
-        example myhost or 10.0.0.1. The user can provide a comma delimited list of
+      description: The hostname on which to create the ETL file. For
+        example myhost. The user can provide a comma delimited list of
         values.
+      isArray: true
+    - name: ip
+      description: The IP of the host on which to run the command. For example 1.1.1.1.
+        The user can provide a comma delimited list of values.
       isArray: true
     - name: etl_path
       required: true
@@ -180,19 +189,25 @@ script:
   - name: ps-remote-etl-create-stop
     arguments:
     - name: host
-      required: true
-      description: The hostname or IP address on which to create the ETL file. For
-        example myhost or 10.0.0.1. The user can provide a comma delimited list of
+      description: The hostname on which to create the ETL file. For
+        example myhost. The user can provide a comma delimited list of
         values.
+      isArray: true
+    - name: ip
+      description: The IP of the host on which to run the command. For example 1.1.1.1.
+        The user can provide a comma delimited list of values.
       isArray: true
     description: This command ends the recording of an ETL file on a windows endpoint.
   - name: ps-remote-export-registry
     arguments:
     - name: host
-      required: true
-      description: The hostname or IP address on which to create the ETL file. For
-        example myhost or 10.0.0.1. The user can provide a comma delimited list of
+      description: The hostname on which to create the ETL file. For
+        example myhost. The user can provide a comma delimited list of
         values.
+      isArray: true
+    - name: ip
+      description: The IP of the host on which to run the command. For example 1.1.1.1.
+        The user can provide a comma delimited list of values.
       isArray: true
     - name: reg_key_hive
       description: The registry key or hive to export. For example reg_key_hive=`HKEY_LOCAL_MACHINE`.
@@ -223,9 +238,11 @@ script:
       required: true
       description: File entry ID as appears in XSOAR.
     - name: host
-      required: true
-      description: The hostname or IP address on which to upload the file. For example
-        myhost or 10.0.0.1.
+      description: The hostname on which to upload the file. For example
+        myhost.
+    - name: ip
+      description: The IP of the host on which to run the command. For example 1.1.1.1.
+        The user can provide a comma delimited list of values.
     - name: path
       required: true
       description: The target path of the file to upload.
@@ -249,18 +266,18 @@ script:
   - name: ps-remote-export-mft
     arguments:
     - name: host
-      required: true
       description: Specify host(s) to retrieve data from.
       isArray: true
+    - name: ip
+      description: The IP of the host on which to run the command. For example 1.1.1.1.
+        The user can provide a comma delimited list of values.
+      isArray: true
     - name: volume
-      required: true
       description: Specify a volume to retrieve its master file table.
-    - name: csv_output
+      defaultvalue: c
+    - name: output_path
       auto: PREDEFINED
-      predefined:
-      - "true"
-      - "false"
-      description: If set to true will return the result as a CSV file.
+      description: The Path the MFT file is to be created in.
       defaultValue: "false"
     description: Extract master file table from volume.
   dockerimage: mcr.microsoft.com/powershell:centos-7
