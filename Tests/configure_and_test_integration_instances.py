@@ -144,8 +144,10 @@ class Build:
         servers = determine_servers_urls(env_conf, ami_env)
         if Build.run_environment == Running.CIRCLECI_RUN:
             server_numeric_version = get_server_numeric_version(ami_env)
+            print('running func')
         else:
             server_numeric_version = Build.DEFAULT_SERVER_VERSION
+            print('default')
         return servers, server_numeric_version
 
 
