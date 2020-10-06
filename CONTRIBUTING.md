@@ -1,9 +1,11 @@
 # Content Contribution Guide
 
+Noy
+
 ![Content logo](xsoar_content_logo.png)
 
 Welcome to Demisto content repo! Contributions are welcome and appreciated.
-
+55
 ## How to contribute
 Please read the following guidelines. Following these guidelines will maximize the chances for a fast, easy and effective review process for everyone involved. If something is not clear, please don't hesitate to reach out to us via GitHub, [Slack](http://go.demisto.com/join-our-slack-community), or [email](mailto:info@demisto.com).
 
