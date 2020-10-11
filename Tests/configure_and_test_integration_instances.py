@@ -516,7 +516,6 @@ def __set_server_keys(client, prints_manager, integration_params, integration_na
 
     response_data, status_code, _ = demisto_client.generic_request_func(self=client, path='/system/config',
                                                                         method='POST', body=data)
-
     try:
         result_object = ast.literal_eval(response_data)
     except ValueError as err:

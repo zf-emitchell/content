@@ -1324,9 +1324,11 @@ def create_test_file(is_nightly, skip_save=False, path_to_pack=''):
             logging.info("Creating filter_file.txt")
             with open("./Tests/filter_file.txt", "w") as filter_file:
                 filter_file.write(tests_string)
+            print(f'Tests string is: {tests_string}')
             logging.info("Creating content_packs_to_install.txt")
             with open("./Tests/content_packs_to_install.txt", "w") as content_packs_to_install:
                 content_packs_to_install.write(packs_to_install_string)
+            print(f"Packs to install string is: {packs_to_install_string}")
 
         if tests_string:
             logging.info('Collected the following tests:\n{0}\n'.format(tests_string))

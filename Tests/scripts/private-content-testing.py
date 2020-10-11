@@ -129,6 +129,9 @@ def install_premium_packs(build: Build, packs_to_install):
 
 
 def install_test_playbooks():
+    playbook_path =
+    api_instance = demisto_client.configure(base_url=base_url, api_key=api_key, debug=True)
+    api_instance.import_playbook(file=)
     #  TODO Install test playbooks
     pass
 
