@@ -11,6 +11,7 @@ from Tests.tools import update_server_configuration
 from demisto_sdk.commands.common.tools import print_error, print_warning, print_color, LOG_COLORS, run_threads_list, \
     run_command, get_yaml, str2bool, format_version, find_type
 from Tests.configure_and_test_integration_instances import Build
+from Tests.scripts.collect_tests_and_content_packs import get_list_of_files_in_the_pack
 
 DOCKER_HARDENING_CONFIGURATION = {
     'docker.cpu.limit': '1.0',
@@ -37,6 +38,7 @@ def options_handler():
     parser.add_argument('-s', '--secret', help='Path to secret conf file')
     parser.add_argument('-n', '--is-nightly', type=str2bool, help='Is nightly build')
     parser.add_argument('-pr', '--is_private', type=str2bool, help='Is private build')
+    parser.add_argument('--packs', help='Pack path which was changed.')
     parser.add_argument('--branch', help='GitHub branch name', required=True)
     parser.add_argument('--build-number', help='CI job number where the instances were created', required=True)
 
@@ -65,19 +67,17 @@ def configure_testing_integration():
     pass
 
 
-def install_premium_packs(build: Build, packs_to_install):
-    #  TODO Install the premium packs from local
+def install_premium_packs(build: Build):
     server = build.servers[0]  # We are only testing on one server right now
     user_name = build.username
     password = build.password
     local_packs = glob.glob(
         "/home/runner/work/content-private/content-private/content/artifacts/packs/*.zip")
-    packs_install_msg = f'Installing the following packs: {packs_to_install}'
-    print(packs_install_msg)
-
     with open('./Tests/content_packs_to_install.txt', 'r') as packs_stream:
         pack_ids = packs_stream.readlines()
         pack_ids_to_install = [pack_id.rstrip('\n') for pack_id in pack_ids]
+    packs_install_msg = f'Installing the following packs: {pack_ids_to_install}'
+    print(packs_install_msg)
     for local_pack in local_packs:
         if any(pack_id in local_pack for pack_id in pack_ids_to_install):
             """ Install packs from zip file.
@@ -128,12 +128,14 @@ def install_premium_packs(build: Build, packs_to_install):
                 sys.exit(1)
 
 
-def install_test_playbooks():
-    playbook_path =
-    api_instance = demisto_client.configure(base_url=base_url, api_key=api_key, debug=True)
-    api_instance.import_playbook(file=)
-    #  TODO Install test playbooks
-    pass
+def install_test_playbooks(playbooks_to_install, build):
+    for playbook in playbooks_to_install:
+        api_instance = demisto_client.configure(base_url=build.servers[0], username=build.username,
+                                                password=build.password, debug=True)
+        with open(playbook, 'r') as pb:
+            response_data, status_code, _ = api_instance.import_playbook(file=pb)
+
+    return response_data, status_code
 
 
 def run_test_module():
@@ -151,9 +153,12 @@ def format_test_results():
     pass
 
 
-def get_list_of_items_to_install_and_test():
-    #  TODO Build a list of items to install/test
+def get_list_of_playbooks_to_install_and_test(pack_paths):
     packs_to_install = {}
+    pack_files = get_list_of_files_in_the_pack(pack_paths)
+    for pack_file in pack_files:
+        if 'TestPlaybooks' in pack_file:
+            packs_to_install.update(pack_file)
     return packs_to_install
 
 
@@ -204,8 +209,10 @@ class Build:
 
 
 def main():
-    build_options = Build(options_handler())
-    packs_to_install = get_list_of_items_to_install_and_test()
+    options = options_handler()
+    build_options = Build(options)
+    pack_paths = options.packs
+    playbooks_to_install = get_list_of_playbooks_to_install_and_test(pack_paths)
     continue_testing = True
     if continue_testing:
         response_data, status_code = update_server_conf(build_options)
@@ -214,8 +221,11 @@ def main():
         response_data, status_code = install_license_to_server(build=build_options)
         continue_testing = process_results(response_data, status_code)
     if continue_testing:
-        response_data, status_code = install_premium_packs(build=build_options, packs_to_install=packs_to_install)
+        response_data, status_code = install_premium_packs(build=build_options)
         continue_testing = process_results(response_data, status_code)
+    if continue_testing:
+        response_data, status_code = install_test_playbooks(playbooks_to_install=playbooks_to_install,
+                                                            build=build_options)
 
 
 if __name__ == '__main__':
