@@ -138,6 +138,11 @@ def install_test_playbooks(playbooks_to_install, build):
     return response_data, status_code
 
 
+def create_instance():
+    #  TODO create an instance of the integration to test
+    pass
+
+
 def run_test_module():
     #  TODO Press the test button.
     pass
@@ -199,13 +204,6 @@ def install_license_to_server(build: Build):
     except ApiException:
         print("Failed to upload license.")
     return message, status_code
-
-
-class Build:
-    def __init__(self):
-        self.servers = ['http://localhost:8080']
-        self.username = 'admin'
-        self.password = 'admin'
 
 
 def main():
