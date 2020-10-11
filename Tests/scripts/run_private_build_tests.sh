@@ -13,7 +13,7 @@ code_1=0
 code_2=0
 
 echo "starting configure_and_test_integration_instances"
-python3 ./Tests/private-content-testing.py -u "$USERNAME" -p "$PASSWORD" -c "$CONF_PATH" -s "$SECRET_CONF_PATH" -g "$GIT_SHA1" --ami_env "$1" -n $IS_NIGHTLY --packs "Packs/${NEW_PACK_NAME}" --branch "$CIRCLE_BRANCH" --build-number "$PREVIOUS_JOB_NUMBER"
+python3 ./Tests/scripts/private-content-testing.py -u "$USERNAME" -p "$PASSWORD" -c "$CONF_PATH" -s "$SECRET_CONF_PATH" -g "$GIT_SHA1" --ami_env "$1" -n $IS_NIGHTLY --packs "Packs/${NEW_PACK_NAME}" --branch "$CIRCLE_BRANCH" --build-number "$PREVIOUS_JOB_NUMBER"
 
 #python3 ./Tests/configure_and_test_integration_instances.py -u "$USERNAME" -p "$PASSWORD" -c "$CONF_PATH" -s "$SECRET_CONF_PATH" -g "$GIT_SHA1" --ami_env "$1" -n $IS_NIGHTLY --branch "$BRANCH_NAME" --build-number "$GITHUB_RUN_NUMBER" -pr true
 #code_1=$?
@@ -42,6 +42,6 @@ if [ $code_1 -eq 0 ] && [ $code_2 -eq 0 ] ; then
   touch "$filepath"
 fi
 let "exit_code = $code_1 + $code_2"
-rm $GOOGLE_APPLICATION_CREDENTIALS
+#rm $GOOGLE_APPLICATION_CREDENTIALS
 
 exit $exit_code
