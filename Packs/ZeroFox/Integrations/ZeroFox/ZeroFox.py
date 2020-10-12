@@ -277,7 +277,7 @@ def http_request(method: str, url_suffix: str, params: Dict = None, data: Union[
             headers=headers
         )
         # Handle error responses gracefully
-        if res.status_code not in {200, 201} and not continue_err:
+        if res.status_code not in {200, 201, 202} and not continue_err:
             err_msg = f'Error calling ZeroFox integration API [{res.status_code}] - {res.reason}\n'
             try:
                 res_json = res.json()
@@ -289,7 +289,7 @@ def http_request(method: str, url_suffix: str, params: Dict = None, data: Union[
                 raise ValueError(err_msg)
         else:
             try:
-                if res.status_code not in {200, 201}:
+                if res.status_code not in {200, 201, 202}:
                     try:
                         res_data = json.loads(res.text)
                     except ValueError:
@@ -714,6 +714,33 @@ def fetch_incidents():
         demisto.setLastRun({'last_fetched_event_timestamp': max_update_time})
     demisto.incidents(incidents)
 
+def submit_phishing_domain(offending_url: str, entity_id: int = None, request_takedown: bool = None) -> Dict:
+    """
+    :param offending_url: url of the domain you want to submit for takedown
+    :param entity_id: entity to associated the alert with
+    :param request_takedown: boolean, whether or not you want to automatically request the domain for takedown
+    :return: HTTP request content.
+    """
+    url_suffix: str = '/threat_submit/phishing_domain/'
+    request_body: Dict = {
+        'offending_url': offending_url,
+        'entity_id': entity_id,
+        'request_takedown': request_takedown
+    }
+    request_body = remove_none_dict(request_body)
+    response_content: Dict = http_request('POST', url_suffix, data=json.dumps(request_body))
+    return response_content
+
+
+def submit_phishing_domain_command():
+    offending_url: str = demisto.args().get('offending_url', '')
+    entity_id: int = demisto.args().get('entity_id', '')
+    request_takedown: bool = demisto.args().get('request_takedown', '')
+    response_content: Dict = submit_phishing_domain(offending_url, entity_id, request_takedown)
+    return_outputs(
+        f'Successful takedown submitted for URL: {offending_url}.'
+        )
+
 
 def test_module():
     """
@@ -741,6 +768,7 @@ def main():
         'zerofox-list-entities': list_entities_command,
         'zerofox-get-entity-types': get_entity_types_command,
         'zerofox-get-policy-types': get_policy_types_command,
+        'zerofox-submit-phishing-domain': submit_phishing_domain_command,
         'fetch-incidents': fetch_incidents,
     }
     try:
